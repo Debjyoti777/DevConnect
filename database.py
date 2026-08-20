@@ -12,7 +12,20 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if DATABASE_URL:
-    database_url = DATABASE_URL
+    if DATABASE_URL.startswith("postgres://"):
+        database_url = DATABASE_URL.replace(
+            "postgres://",
+            "postgresql+psycopg://",
+            1
+        )
+    elif DATABASE_URL.startswith("postgresql://"):
+        database_url = DATABASE_URL.replace(
+            "postgresql://",
+            "postgresql+psycopg://",
+            1
+        )
+    else:
+        database_url = DATABASE_URL
 else:
     database_url = URL.create(
         drivername="postgresql+psycopg",
