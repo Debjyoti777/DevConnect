@@ -1,9 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
+
 
 from database import get_db
 from models.user import User
 from models.skill import Skill
+from models.project import Project
+
 from utils.auth import get_current_user
 from schemas.user import UserCreate, UserResponse, ProfileResponse
 from utils.password import hash_password
@@ -89,12 +93,20 @@ def search_users_by_skill(
     if not search_term:
         return []
 
+    search_pattern = f"%{search_term}%"
+
     users = (
         db.query(User)
-        .join(User.skills)
         .filter(
-            Skill.name.ilike(
-                f"%{search_term}%"
+            or_(
+                User.skills.any(
+                    Skill.name.ilike(search_pattern)
+                ),
+                User.projects.any(
+                    Project.skills.any(
+                        Skill.name.ilike(search_pattern)
+                    )
+                )
             )
         )
         .distinct()
