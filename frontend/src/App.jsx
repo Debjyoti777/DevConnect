@@ -1301,144 +1301,140 @@ function App() {
 
     const searchDevelopers = async (e) => {
 
-        /*
-         * Prevent form refresh
-         */
+    if (e) {
+        e.preventDefault();
+    }
 
-        if (e) {
-            e.preventDefault();
-        }
+    const searchTerm = skillSearch.trim();
 
+    console.log(
+        "Developer search started:",
+        searchTerm
+    );
 
-        const searchTerm =
-            skillSearch.trim();
+    if (!searchTerm) {
 
+        setDevelopers([]);
 
-        console.log(
-            "Developer search started:",
-            searchTerm
-        );
+        setSearchPerformed(false);
 
-
-        /*
-         * Empty search
-         */
-
-        if (!searchTerm) {
-
-            setDevelopers([]);
-
-            setSearchPerformed(false);
-
-            return;
-
-        }
-
-
-        setSearchLoading(true);
-
-        setSearchPerformed(true);
+        setSearchLoading(false);
 
         setError("");
 
+        return;
+    }
 
-        try {
+    setSearchLoading(true);
+    setSearchPerformed(true);
+    setDevelopers([]);
+    setError("");
 
-            const searchUrl =
-                `${API_URL}/users/search?skill=${encodeURIComponent(searchTerm)}`;
+    try {
 
+        const searchUrl =
+            `${API_URL}/users/search?skill=${encodeURIComponent(searchTerm)}`;
 
-            console.log(
-                "Searching URL:",
-                searchUrl
-            );
+        console.log(
+            "Searching URL:",
+            searchUrl
+        );
 
+        const response = await fetch(
+            searchUrl,
+            {
+                method: "GET",
+                headers: {
+                    "Accept": "application/json"
+                }
+            }
+        );
 
-            const response =
-                await fetch(
-                    searchUrl,
-                    {
-                        method: "GET",
+        console.log(
+            "Search response status:",
+            response.status
+        );
 
-                        headers: {
-                            Accept:
-                                "application/json"
-                        }
-                    }
-                );
+        const data =
+            await response.json();
 
+        console.log(
+            "Search response data:",
+            data
+        );
 
-            console.log(
-                "Search response status:",
-                response.status
-            );
+        if (!response.ok) {
 
+            let errorMessage =
+                "Could not search developers.";
 
-            const data =
-                await response.json();
-
-
-            console.log(
-                "Search response data:",
-                data
-            );
-
-
-            if (!response.ok) {
-
-                setDevelopers([]);
-
-                setError(
-                    data.detail ||
-                    "Could not search developers."
-                );
-
-                return;
-
+            if (
+                typeof data?.detail === "string"
+            ) {
+                errorMessage = data.detail;
             }
 
-
-            if (!Array.isArray(data)) {
-
-                console.error(
-                    "Unexpected search response:",
-                    data
-                );
-
-                setDevelopers([]);
-
-                setError(
-                    "Unexpected response from server."
-                );
-
-                return;
-
+            else if (
+                Array.isArray(data?.detail)
+            ) {
+                errorMessage =
+                    data.detail
+                        .map(
+                            item =>
+                                item.msg ||
+                                "Invalid request"
+                        )
+                        .join(", ");
             }
 
+            setDevelopers([]);
 
-            setDevelopers(data);
+            setError(errorMessage);
 
+            return;
+        }
 
-        } catch (err) {
+        if (!Array.isArray(data)) {
 
             console.error(
-                "Developer search error:",
-                err
+                "Unexpected response:",
+                data
             );
 
             setDevelopers([]);
 
             setError(
-                "Could not connect to the server."
+                "Server returned an unexpected response."
             );
 
-        } finally {
-
-            setSearchLoading(false);
-
+            return;
         }
 
-    };
+        setDevelopers(data);
+
+    }
+
+    catch (err) {
+
+        console.error(
+            "Developer search error:",
+            err
+        );
+
+        setDevelopers([]);
+
+        setError(
+            "Could not connect to the server."
+        );
+
+    }
+
+    finally {
+
+        setSearchLoading(false);
+
+    }
+};
 
 
     /* =========================================

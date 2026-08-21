@@ -4,17 +4,17 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.user import User
 from models.skill import Skill
-from models.project import Project
-
 from utils.auth import get_current_user
-
 from schemas.user import UserCreate, UserResponse, ProfileResponse
-
 from utils.password import hash_password
 
 
 router = APIRouter()
 
+
+# =========================================================
+# GET ALL USERS
+# =========================================================
 
 @router.get("/users")
 def get_users(
@@ -32,6 +32,10 @@ def get_users(
     ]
 
 
+# =========================================================
+# CREATE USER
+# =========================================================
+
 @router.post(
     "/users",
     response_model=UserResponse,
@@ -41,6 +45,8 @@ def create_user(
     user: UserCreate,
     db: Session = Depends(get_db)
 ):
+
+    # Check whether email already exists
     existing_user = (
         db.query(User)
         .filter(User.email == user.email)
@@ -65,11 +71,19 @@ def create_user(
 
     return new_user
 
-@router.get("/search")
+
+# =========================================================
+# SEARCH USERS BY SKILL
+# IMPORTANT:
+# KEEP THIS BEFORE /users/{user_id}
+# =========================================================
+
+@router.get("/users/search")
 def search_users_by_skill(
     skill: str,
     db: Session = Depends(get_db)
 ):
+
     search_term = skill.strip()
 
     if not search_term:
@@ -77,10 +91,11 @@ def search_users_by_skill(
 
     users = (
         db.query(User)
-        .join(Project, Project.user_id == User.id)
-        .join(Project.skills)
+        .join(User.skills)
         .filter(
-            Skill.name.ilike(f"%{search_term}%")
+            Skill.name.ilike(
+                f"%{search_term}%"
+            )
         )
         .distinct()
         .all()
@@ -93,13 +108,15 @@ def search_users_by_skill(
             "email": user.email
         }
         for user in users
-    ]    
+    ]
 
-# IMPORTANT:
-# /users/me MUST come before /users/{user_id}
+
+# =========================================================
+# GET CURRENT USER
+# =========================================================
 
 @router.get(
-    "/users/me",
+    "/me",
     response_model=ProfileResponse
 )
 def get_me(
@@ -107,6 +124,12 @@ def get_me(
 ):
     return current_user
 
+
+# =========================================================
+# GET USER BY ID
+# IMPORTANT:
+# THIS COMES AFTER /users/search
+# =========================================================
 
 @router.get(
     "/users/{user_id}",
@@ -116,6 +139,7 @@ def get_user(
     user_id: int,
     db: Session = Depends(get_db)
 ):
+
     user = (
         db.query(User)
         .filter(User.id == user_id)
@@ -131,6 +155,10 @@ def get_user(
     return user
 
 
+# =========================================================
+# UPDATE USER
+# =========================================================
+
 @router.put(
     "/users/{user_id}",
     response_model=UserResponse
@@ -140,6 +168,7 @@ def update_user(
     user: UserCreate,
     db: Session = Depends(get_db)
 ):
+
     existing_user = (
         db.query(User)
         .filter(User.id == user_id)
@@ -164,11 +193,16 @@ def update_user(
     return existing_user
 
 
+# =========================================================
+# DELETE USER
+# =========================================================
+
 @router.delete("/users/{user_id}")
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db)
 ):
+
     user = (
         db.query(User)
         .filter(User.id == user_id)
@@ -189,12 +223,17 @@ def delete_user(
     }
 
 
+# =========================================================
+# ADD SKILL TO CURRENT USER
+# =========================================================
+
 @router.post("/me/skills/{skill_id}")
 def add_skill_to_user(
     skill_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+
     skill = (
         db.query(Skill)
         .filter(Skill.id == skill_id)
@@ -222,12 +261,21 @@ def add_skill_to_user(
     }
 
 
+# =========================================================
+# GET CURRENT USER SKILLS
+# =========================================================
+
 @router.get("/me/skills")
 def get_my_skills(
     current_user: User = Depends(get_current_user)
 ):
+
     return current_user.skills
 
+
+# =========================================================
+# REMOVE SKILL FROM CURRENT USER
+# =========================================================
 
 @router.delete("/me/skills/{skill_id}")
 def remove_skill_from_user(
@@ -235,6 +283,7 @@ def remove_skill_from_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+
     skill = (
         db.query(Skill)
         .filter(Skill.id == skill_id)
