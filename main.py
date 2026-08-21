@@ -40,7 +40,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "https://dev-connect-5dzjrvqeq-dj-fccc.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
