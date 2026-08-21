@@ -10,11 +10,14 @@ from schemas.user import UserCreate, UserResponse, ProfileResponse
 
 from utils.password import hash_password
 
+
 router = APIRouter()
 
 
 @router.get("/users")
-def get_users(db: Session = Depends(get_db)):
+def get_users(
+    db: Session = Depends(get_db)
+):
     users = db.query(User).all()
 
     return [
@@ -26,11 +29,28 @@ def get_users(db: Session = Depends(get_db)):
         for user in users
     ]
 
-@router.post("/users", response_model=UserResponse, status_code=201)
+
+@router.post(
+    "/users",
+    response_model=UserResponse,
+    status_code=201
+)
 def create_user(
     user: UserCreate,
     db: Session = Depends(get_db)
 ):
+    existing_user = (
+        db.query(User)
+        .filter(User.email == user.email)
+        .first()
+    )
+
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+
     new_user = User(
         name=user.name,
         email=user.email,
@@ -66,9 +86,32 @@ def search_users_by_skill(
     ]
 
 
-@router.get("/users/{user_id}", response_model=UserResponse)
-def get_user(user_id: int, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == user_id).first()
+# IMPORTANT:
+# /users/me MUST come before /users/{user_id}
+
+@router.get(
+    "/users/me",
+    response_model=ProfileResponse
+)
+def get_me(
+    current_user: User = Depends(get_current_user)
+):
+    return current_user
+
+
+@router.get(
+    "/users/{user_id}",
+    response_model=UserResponse
+)
+def get_user(
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    user = (
+        db.query(User)
+        .filter(User.id == user_id)
+        .first()
+    )
 
     if user is None:
         raise HTTPException(
@@ -78,13 +121,21 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
 
     return user
 
-@router.put("/users/{user_id}", response_model=UserResponse)
+
+@router.put(
+    "/users/{user_id}",
+    response_model=UserResponse
+)
 def update_user(
     user_id: int,
     user: UserCreate,
     db: Session = Depends(get_db)
 ):
-    existing_user = db.query(User).filter(User.id == user_id).first()
+    existing_user = (
+        db.query(User)
+        .filter(User.id == user_id)
+        .first()
+    )
 
     if existing_user is None:
         raise HTTPException(
@@ -94,16 +145,26 @@ def update_user(
 
     existing_user.name = user.name
     existing_user.email = user.email
-    existing_user.password = hash_password(user.password)
+    existing_user.password = hash_password(
+        user.password
+    )
 
     db.commit()
     db.refresh(existing_user)
 
     return existing_user
 
+
 @router.delete("/users/{user_id}")
-def delete_user(user_id: int, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == user_id).first()
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db)
+):
+    user = (
+        db.query(User)
+        .filter(User.id == user_id)
+        .first()
+    )
 
     if user is None:
         raise HTTPException(
@@ -118,12 +179,6 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
         "message": "User deleted successfully"
     }
 
-@router.get("/me", response_model=ProfileResponse)
-def get_me(
-    current_user: User = Depends(get_current_user)
-):
-    return current_user
-
 
 @router.post("/me/skills/{skill_id}")
 def add_skill_to_user(
@@ -131,7 +186,11 @@ def add_skill_to_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    skill = db.query(Skill).filter(Skill.id == skill_id).first()
+    skill = (
+        db.query(Skill)
+        .filter(Skill.id == skill_id)
+        .first()
+    )
 
     if skill is None:
         raise HTTPException(
@@ -167,7 +226,11 @@ def remove_skill_from_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    skill = db.query(Skill).filter(Skill.id == skill_id).first()
+    skill = (
+        db.query(Skill)
+        .filter(Skill.id == skill_id)
+        .first()
+    )
 
     if skill is None:
         raise HTTPException(
