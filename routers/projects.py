@@ -14,7 +14,6 @@ router = APIRouter(
     tags=["Projects"]
 )
 
-
 @router.post("/", response_model=ProjectResponse)
 def create_project(
     project: ProjectCreate,
@@ -33,6 +32,39 @@ def create_project(
     db.refresh(new_project)
 
     return new_project
+
+@router.get("/public")
+def get_public_projects(
+    db: Session = Depends(get_db)
+):
+    projects = (
+        db.query(Project, User)
+        .join(User, Project.user_id == User.id)
+        .all()
+    )
+
+    result = []
+
+    for project, user in projects:
+
+        result.append({
+            "id": project.id,
+            "title": project.title,
+            "description": project.description,
+            "github_url": project.github_url,
+            "user_id": project.user_id,
+            "user_name": user.name,
+            "skills": [
+                {
+                    "id": skill.id,
+                    "name": skill.name
+                }
+                for skill in project.skills
+            ]
+        })
+
+    return result
+
 
 @router.post("/{project_id}/skills/{skill_id}")
 def add_skill_to_project(
@@ -76,6 +108,16 @@ def add_skill_to_project(
         "message": "Skill added to project successfully"
     }
 
+@router.get("/public", response_model=list[ProjectResponse])
+def get_public_projects(
+    db: Session = Depends(get_db)
+):
+    projects = (
+        db.query(Project)
+        .all()
+    )
+
+    return projects
 
 @router.get("/{project_id}/skills")
 def get_project_skills(

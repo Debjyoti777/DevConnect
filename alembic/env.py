@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 
 from alembic import context
 
-from database import Base, DATABASE_URL
+from database import Base, database_url
 
 from models.user import User
 from models.skill import Skill
@@ -65,11 +65,11 @@ def run_migrations_online() -> None:
 
     """
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = DATABASE_URL
+    configuration["sqlalchemy.url"] = str(database_url)
 
     connectable = create_engine(
-    DATABASE_URL,
-    poolclass=pool.NullPool
+        database_url,
+        poolclass=pool.NullPool
     )
 
     with connectable.connect() as connection:
