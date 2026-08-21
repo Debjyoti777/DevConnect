@@ -23,7 +23,7 @@ if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY is not set")
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 30*24*60
 
 
 def create_access_token(data: dict):

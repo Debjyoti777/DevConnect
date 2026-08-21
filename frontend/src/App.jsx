@@ -13,6 +13,10 @@ function App() {
 
     const [user, setUser] = useState(null);
 
+    // Prevent the app from briefly showing the logged-out state
+    // while we restore the saved login session after a refresh.
+    const [authReady, setAuthReady] = useState(false);
+
     const [page, setPage] = useState("home");
 
     const [projects, setProjects] = useState([]);
@@ -89,34 +93,149 @@ function App() {
 
 
     /* =========================================
-       INITIAL LOAD
+       INITIAL LOAD / RESTORE LOGIN SESSION
     ========================================= */
 
     useEffect(() => {
 
-        const savedToken =
-            localStorage.getItem("token");
+        const restoreSession = async () => {
 
-        const savedUser =
-            localStorage.getItem("user");
+            const savedToken =
+                localStorage.getItem("token");
 
-        if (savedToken && savedUser) {
+            const savedPage =
+                localStorage.getItem("page");
+
+            // Restore the last page after refresh.
+            if (savedPage) {
+                setPage(savedPage);
+            }
+
+            // No saved token = user is genuinely logged out.
+            if (!savedToken) {
+                setAuthReady(true);
+                return;
+            }
 
             try {
 
-                setUser(JSON.parse(savedUser));
+                /*
+                 * Do not blindly trust the user object stored in
+                 * localStorage. Ask the backend who owns the token.
+                 *
+                 * This also detects an expired/invalid JWT.
+                 */
+                const response =
+                    await fetch(
+                        `${API_URL}/users/me`,
+                        {
+                            headers: {
+                                Authorization:
+                                    `Bearer ${savedToken}`
+                            }
+                        }
+                    );
 
-            } catch {
+                const data =
+                    await response.json();
 
-                localStorage.removeItem("token");
+                if (!response.ok) {
 
-                localStorage.removeItem("user");
+                    console.warn(
+                        "Saved login session is no longer valid:",
+                        data
+                    );
 
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("user");
+
+                    setUser(null);
+
+                    // Do not leave the user on a private page
+                    // after an expired/invalid token.
+                    if (
+                        savedPage === "profile" ||
+                        savedPage === "projects"
+                    ) {
+                        setPage("home");
+        localStorage.setItem("page", "home");
+                        localStorage.setItem(
+                            "page",
+                            "home"
+                        );
+                    }
+
+                    return;
+                }
+
+                setUser(data);
+
+                localStorage.setItem(
+                    "user",
+                    JSON.stringify(data)
+                );
+
+            } catch (err) {
+
+                console.error(
+                    "Could not restore login session:",
+                    err
+                );
+
+                /*
+                 * Keep the token if the server is temporarily
+                 * unreachable. That way a refresh does not
+                 * unnecessarily log the user out.
+                 */
+                const savedUser =
+                    localStorage.getItem("user");
+
+                if (savedUser) {
+
+                    try {
+                        setUser(
+                            JSON.parse(savedUser)
+                        );
+                    } catch {
+                        // Ignore invalid cached user data.
+                    }
+
+                }
+
+            } finally {
+
+                setAuthReady(true);
+
+            }
+
+        };
+
+        restoreSession();
+
+    }, []);
+
+
+    /* =========================================
+       RESTORE PAGE DATA AFTER AUTH RESTORATION
+    ========================================= */
+
+    useEffect(() => {
+
+        if (!authReady) {
+            return;
+        }
+
+        if (page === "projects") {
+
+            if (user) {
+                getMyProjects();
+            } else {
+                getPublicProjects();
             }
 
         }
 
-    }, []);
+    }, [authReady, user, page]);
 
 
     /* =========================================
@@ -135,6 +254,7 @@ function App() {
     const goLogin = () => {
 
         setPage("login");
+        localStorage.setItem("page", "login");
 
         clearMessages();
 
@@ -144,6 +264,7 @@ function App() {
     const goRegister = () => {
 
         setPage("register");
+        localStorage.setItem("page", "register");
 
         clearMessages();
 
@@ -153,6 +274,7 @@ function App() {
     const goDiscover = () => {
 
         setPage("discover");
+        localStorage.setItem("page", "discover");
 
         clearMessages();
 
@@ -162,6 +284,7 @@ function App() {
     const goProjects = () => {
 
         setPage("projects");
+        localStorage.setItem("page", "projects");
 
         clearMessages();
 
@@ -181,6 +304,7 @@ function App() {
     const goProfile = () => {
 
         setPage("profile");
+        localStorage.setItem("page", "profile");
 
         clearMessages();
 
@@ -325,6 +449,7 @@ function App() {
 
 
             setPage("home");
+            localStorage.setItem("page", "home");
 
 
         } catch (err) {
@@ -449,6 +574,10 @@ function App() {
 
         localStorage.removeItem(
             "user"
+        );
+
+        localStorage.removeItem(
+            "page"
         );
 
         setUser(null);
@@ -2463,6 +2592,16 @@ function App() {
     /* =========================================
        MAIN PAGE RENDER
     ========================================= */
+
+    if (!authReady) {
+
+        return (
+            <div className="loading">
+                Loading DevConnect...
+            </div>
+        );
+
+    }
 
     return (
 
