@@ -69,10 +69,18 @@ def search_users_by_skill(
     skill: str,
     db: Session = Depends(get_db)
 ):
+    search_term = skill.strip()
+
+    if not search_term:
+        return []
+
     users = (
         db.query(User)
         .join(User.skills)
-        .filter(Skill.name.ilike(skill))
+        .filter(
+            Skill.name.ilike(f"%{search_term}%")
+        )
+        .distinct()
         .all()
     )
 
@@ -84,7 +92,6 @@ def search_users_by_skill(
         }
         for user in users
     ]
-
 
 # IMPORTANT:
 # /users/me MUST come before /users/{user_id}

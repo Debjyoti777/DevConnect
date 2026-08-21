@@ -345,7 +345,7 @@ function App() {
 
             const response =
                 await fetch(
-                    `${API_URL}/users`,
+                    `${API_URL}/`,
                     {
                         method: "POST",
 
@@ -1221,37 +1221,44 @@ function App() {
        DISCOVER DEVELOPERS
     ========================================= */
 
-    const searchDevelopers = async () => {
-        try {
+          const searchDevelopers = async () => {
 
-            const response =
-                await fetch(
-                    `${API_URL}/users/search?skill=${encodeURIComponent(skillSearch)}`
-                );
+          const searchTerm = skillSearch.trim();
 
+          if (!searchTerm) {
+              setDevelopers([]);
+              return;
+          }
 
-            const data =
-                await response.json();
+          try {
 
+              const response = await fetch(
+                  `${API_URL}/users/search?skill=${encodeURIComponent(searchTerm)}`
+              );
 
-            if (response.ok) {
+              const data = await response.json();
 
-                setDevelopers(data);
+              if (!response.ok) {
 
-            } else {
+                  console.error(data);
 
-                setDevelopers([]);
+                  setDevelopers([]);
 
-            }
+                  return;
+              }
 
-        } catch (err) {
+              setDevelopers(data);
 
-            console.error(err);
+          } catch (err) {
 
-            setDevelopers([]);
+              console.error(
+                  "Could not search developers:",
+                  err
+              );
 
-        }
-    };
+              setDevelopers([]);
+          }
+      };
 
 
     /* =========================================
