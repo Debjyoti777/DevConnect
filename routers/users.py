@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.user import User
 from models.skill import Skill
+from models.project import Project
+
 from utils.auth import get_current_user
 
 from schemas.user import UserCreate, UserResponse, ProfileResponse
@@ -63,8 +65,7 @@ def create_user(
 
     return new_user
 
-
-@router.get("/users/search")
+@router.get("/search")
 def search_users_by_skill(
     skill: str,
     db: Session = Depends(get_db)
@@ -74,11 +75,14 @@ def search_users_by_skill(
     if not search_term:
         return []
 
-    # Search users who have the skill in their profile
-    profile_users = (
+    users = (
         db.query(User)
-        .join(User.skills)
-        .filter(Skill.name.ilike(f"%{search_term}%"))
+        .join(Project, Project.user_id == User.id)
+        .join(Project.skills)
+        .filter(
+            Skill.name.ilike(f"%{search_term}%")
+        )
+        .distinct()
         .all()
     )
 
@@ -88,8 +92,8 @@ def search_users_by_skill(
             "name": user.name,
             "email": user.email
         }
-        for user in profile_users
-    ]
+        for user in users
+    ]    
 
 # IMPORTANT:
 # /users/me MUST come before /users/{user_id}

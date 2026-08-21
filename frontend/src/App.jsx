@@ -49,7 +49,6 @@ function App() {
     const [editingProject, setEditingProject] =
         useState(null);
 
-
     const [projectTitle, setProjectTitle] =
         useState("");
 
@@ -72,6 +71,12 @@ function App() {
 
     const [developers, setDevelopers] =
         useState([]);
+
+    const [searchLoading, setSearchLoading] =
+        useState(false);
+
+    const [searchPerformed, setSearchPerformed] =
+        useState(false);
 
 
     /* =========================================
@@ -108,6 +113,7 @@ function App() {
                 localStorage.removeItem("user");
 
             }
+
         }
 
     }, []);
@@ -200,133 +206,144 @@ function App() {
 
     const login = async (e) => {
 
-    e.preventDefault();
+        e.preventDefault();
 
-    clearMessages();
+        clearMessages();
 
-    setLoading(true);
+        setLoading(true);
 
-    try {
+        try {
 
-        const formData = new URLSearchParams();
+            const formData =
+                new URLSearchParams();
 
-        formData.append("username", email);
-        formData.append("password", password);
-
-
-        const response = await fetch(
-            `${API_URL}/auth/login`,
-            {
-                method: "POST",
-
-                headers: {
-                    "Content-Type":
-                        "application/x-www-form-urlencoded"
-                },
-
-                body: formData
-            }
-        );
-
-
-        const data = await response.json();
-
-
-        if (!response.ok) {
-
-            setError(
-                data.detail ||
-                "Login failed"
+            formData.append(
+                "username",
+                email
             );
 
-            setLoading(false);
-
-            return;
-        }
-
-
-        const token =
-            data.access_token;
+            formData.append(
+                "password",
+                password
+            );
 
 
-        localStorage.setItem(
-            "token",
-            token
-        );
+            const response =
+                await fetch(
+                    `${API_URL}/auth/login`,
+                    {
+                        method: "POST",
 
+                        headers: {
+                            "Content-Type":
+                                "application/x-www-form-urlencoded"
+                        },
 
-        /*
-         * Get current user after login
-         */
-
-        const userResponse =
-            await fetch(
-                `${API_URL}/users/me`,
-                {
-                    headers: {
-                        Authorization:
-                            `Bearer ${token}`
+                        body: formData
                     }
-                }
+                );
+
+
+            const data =
+                await response.json();
+
+
+            if (!response.ok) {
+
+                setError(
+                    data.detail ||
+                    "Login failed"
+                );
+
+                setLoading(false);
+
+                return;
+
+            }
+
+
+            const token =
+                data.access_token;
+
+
+            localStorage.setItem(
+                "token",
+                token
             );
 
 
-        const userData =
-            await userResponse.json();
+            const userResponse =
+                await fetch(
+                    `${API_URL}/users/me`,
+                    {
+                        headers: {
+                            Authorization:
+                                `Bearer ${token}`
+                        }
+                    }
+                );
 
 
-        if (!userResponse.ok) {
+            const userData =
+                await userResponse.json();
+
+
+            if (!userResponse.ok) {
+
+                setError(
+                    userData.detail ||
+                    "Could not load user profile."
+                );
+
+                localStorage.removeItem(
+                    "token"
+                );
+
+                setLoading(false);
+
+                return;
+
+            }
+
+
+            setUser(userData);
+
+            localStorage.setItem(
+                "user",
+                JSON.stringify(userData)
+            );
+
+
+            setEmail("");
+
+            setPassword("");
+
+
+            setMessage(
+                "Login successful!"
+            );
+
+
+            setPage("home");
+
+
+        } catch (err) {
+
+            console.error(
+                "Login error:",
+                err
+            );
 
             setError(
-                userData.detail ||
-                "Could not load user profile."
+                "Could not connect to the server."
             );
 
-            localStorage.removeItem("token");
-
-            setLoading(false);
-
-            return;
         }
 
 
-        setUser(userData);
+        setLoading(false);
 
-        localStorage.setItem(
-            "user",
-            JSON.stringify(userData)
-        );
-
-
-        setEmail("");
-
-        setPassword("");
-
-
-        setMessage(
-            "Login successful!"
-        );
-
-
-        setPage("home");
-
-
-    } catch (err) {
-
-        console.error(
-            "Login error:",
-            err
-        );
-
-        setError(
-            "Could not connect to the server."
-        );
-
-    }
-
-
-    setLoading(false);
-};
+    };
 
 
     /* =========================================
@@ -343,9 +360,15 @@ function App() {
 
         try {
 
+            /*
+             * IMPORTANT:
+             * Backend registration endpoint is:
+             * POST /users
+             */
+
             const response =
                 await fetch(
-                    `${API_URL}/`,
+                    `${API_URL}/users`,
                     {
                         method: "POST",
 
@@ -377,6 +400,7 @@ function App() {
                 setLoading(false);
 
                 return;
+
             }
 
 
@@ -397,7 +421,10 @@ function App() {
 
         } catch (err) {
 
-            console.error(err);
+            console.error(
+                "Registration error:",
+                err
+            );
 
             setError(
                 "Could not connect to the server."
@@ -406,6 +433,7 @@ function App() {
         }
 
         setLoading(false);
+
     };
 
 
@@ -415,9 +443,13 @@ function App() {
 
     const logout = () => {
 
-        localStorage.removeItem("token");
+        localStorage.removeItem(
+            "token"
+        );
 
-        localStorage.removeItem("user");
+        localStorage.removeItem(
+            "user"
+        );
 
         setUser(null);
 
@@ -428,6 +460,7 @@ function App() {
         setMessage(
             "You have been logged out."
         );
+
     };
 
 
@@ -453,11 +486,15 @@ function App() {
 
             if (!response.ok) {
 
-                console.error(data);
+                console.error(
+                    "Public projects error:",
+                    data
+                );
 
                 setPublicProjects([]);
 
                 return;
+
             }
 
 
@@ -477,6 +514,7 @@ function App() {
             setLoading(false);
 
         }
+
     };
 
 
@@ -489,11 +527,13 @@ function App() {
         const token =
             getToken();
 
+
         if (!token) {
 
             getPublicProjects();
 
             return;
+
         }
 
 
@@ -519,11 +559,15 @@ function App() {
 
             if (!response.ok) {
 
-                console.error(data);
+                console.error(
+                    "My projects error:",
+                    data
+                );
 
                 setProjects([]);
 
                 return;
+
             }
 
 
@@ -531,7 +575,10 @@ function App() {
 
         } catch (err) {
 
-            console.error(err);
+            console.error(
+                "Could not fetch my projects:",
+                err
+            );
 
             setProjects([]);
 
@@ -540,6 +587,7 @@ function App() {
             setLoading(false);
 
         }
+
     };
 
 
@@ -553,6 +601,7 @@ function App() {
 
             const token =
                 getToken();
+
 
             const response =
                 await fetch(
@@ -586,6 +635,7 @@ function App() {
             );
 
         }
+
     };
 
 
@@ -610,6 +660,7 @@ function App() {
         await getSkills();
 
         setShowProjectModal(true);
+
     };
 
 
@@ -653,6 +704,7 @@ function App() {
 
 
         setShowProjectModal(true);
+
     };
 
 
@@ -717,6 +769,7 @@ function App() {
             ...selectedSkills,
             skill
         ]);
+
     };
 
 
@@ -732,6 +785,7 @@ function App() {
                     skill.id !== skillId
             )
         );
+
     };
 
 
@@ -752,6 +806,7 @@ function App() {
             );
 
             return;
+
         }
 
 
@@ -762,6 +817,7 @@ function App() {
             );
 
             return;
+
         }
 
 
@@ -772,6 +828,7 @@ function App() {
             );
 
             return;
+
         }
 
 
@@ -825,11 +882,12 @@ function App() {
                 setLoading(false);
 
                 return;
+
             }
 
 
             /*
-             * Add selected skills to project
+             * Add selected skills
              */
 
             for (
@@ -837,17 +895,28 @@ function App() {
                 of selectedSkills
             ) {
 
-                await fetch(
-                    `${API_URL}/projects/${data.id}/skills/${skill.id}`,
-                    {
-                        method: "POST",
+                const skillResponse =
+                    await fetch(
+                        `${API_URL}/projects/${data.id}/skills/${skill.id}`,
+                        {
+                            method: "POST",
 
-                        headers: {
-                            Authorization:
-                                `Bearer ${token}`
+                            headers: {
+                                Authorization:
+                                    `Bearer ${token}`
+                            }
                         }
-                    }
-                );
+                    );
+
+
+                if (!skillResponse.ok) {
+
+                    console.error(
+                        "Could not add skill:",
+                        skill
+                    );
+
+                }
 
             }
 
@@ -856,13 +925,6 @@ function App() {
 
 
             await getMyProjects();
-
-
-            /*
-             * Also refresh public projects
-             * so the new project appears
-             * to other users.
-             */
 
             await getPublicProjects();
 
@@ -874,7 +936,10 @@ function App() {
 
         } catch (err) {
 
-            console.error(err);
+            console.error(
+                "Create project error:",
+                err
+            );
 
             setError(
                 "Could not connect to the server."
@@ -884,6 +949,7 @@ function App() {
 
 
         setLoading(false);
+
     };
 
 
@@ -909,6 +975,7 @@ function App() {
             );
 
             return;
+
         }
 
 
@@ -919,6 +986,7 @@ function App() {
             );
 
             return;
+
         }
 
 
@@ -972,12 +1040,9 @@ function App() {
                 setLoading(false);
 
                 return;
+
             }
 
-
-            /*
-             * Get existing skills
-             */
 
             let existingSkills = [];
 
@@ -1005,7 +1070,10 @@ function App() {
 
             } catch (err) {
 
-                console.error(err);
+                console.error(
+                    "Could not get existing skills:",
+                    err
+                );
 
             }
 
@@ -1097,7 +1165,10 @@ function App() {
 
         } catch (err) {
 
-            console.error(err);
+            console.error(
+                "Update project error:",
+                err
+            );
 
             setError(
                 "Could not connect to the server."
@@ -1107,6 +1178,7 @@ function App() {
 
 
         setLoading(false);
+
     };
 
 
@@ -1125,6 +1197,7 @@ function App() {
             await createProject();
 
         }
+
     };
 
 
@@ -1189,6 +1262,7 @@ function App() {
                 setLoading(false);
 
                 return;
+
             }
 
 
@@ -1204,7 +1278,10 @@ function App() {
 
         } catch (err) {
 
-            console.error(err);
+            console.error(
+                "Delete project error:",
+                err
+            );
 
             setError(
                 "Could not connect to the server."
@@ -1214,6 +1291,7 @@ function App() {
 
 
         setLoading(false);
+
     };
 
 
@@ -1221,44 +1299,146 @@ function App() {
        DISCOVER DEVELOPERS
     ========================================= */
 
-          const searchDevelopers = async () => {
+    const searchDevelopers = async (e) => {
 
-          const searchTerm = skillSearch.trim();
+        /*
+         * Prevent form refresh
+         */
 
-          if (!searchTerm) {
-              setDevelopers([]);
-              return;
-          }
+        if (e) {
+            e.preventDefault();
+        }
 
-          try {
 
-              const response = await fetch(
-                  `${API_URL}/users/search?skill=${encodeURIComponent(searchTerm)}`
-              );
+        const searchTerm =
+            skillSearch.trim();
 
-              const data = await response.json();
 
-              if (!response.ok) {
+        console.log(
+            "Developer search started:",
+            searchTerm
+        );
 
-                  console.error(data);
 
-                  setDevelopers([]);
+        /*
+         * Empty search
+         */
 
-                  return;
-              }
+        if (!searchTerm) {
 
-              setDevelopers(data);
+            setDevelopers([]);
 
-          } catch (err) {
+            setSearchPerformed(false);
 
-              console.error(
-                  "Could not search developers:",
-                  err
-              );
+            return;
 
-              setDevelopers([]);
-          }
-      };
+        }
+
+
+        setSearchLoading(true);
+
+        setSearchPerformed(true);
+
+        setError("");
+
+
+        try {
+
+            const searchUrl =
+                `${API_URL}/users/search?skill=${encodeURIComponent(searchTerm)}`;
+
+
+            console.log(
+                "Searching URL:",
+                searchUrl
+            );
+
+
+            const response =
+                await fetch(
+                    searchUrl,
+                    {
+                        method: "GET",
+
+                        headers: {
+                            Accept:
+                                "application/json"
+                        }
+                    }
+                );
+
+
+            console.log(
+                "Search response status:",
+                response.status
+            );
+
+
+            const data =
+                await response.json();
+
+
+            console.log(
+                "Search response data:",
+                data
+            );
+
+
+            if (!response.ok) {
+
+                setDevelopers([]);
+
+                setError(
+                    data.detail ||
+                    "Could not search developers."
+                );
+
+                return;
+
+            }
+
+
+            if (!Array.isArray(data)) {
+
+                console.error(
+                    "Unexpected search response:",
+                    data
+                );
+
+                setDevelopers([]);
+
+                setError(
+                    "Unexpected response from server."
+                );
+
+                return;
+
+            }
+
+
+            setDevelopers(data);
+
+
+        } catch (err) {
+
+            console.error(
+                "Developer search error:",
+                err
+            );
+
+            setDevelopers([]);
+
+            setError(
+                "Could not connect to the server."
+            );
+
+        } finally {
+
+            setSearchLoading(false);
+
+        }
+
+    };
 
 
     /* =========================================
@@ -1287,6 +1467,8 @@ function App() {
                     {!isLogin && (
 
                         <input
+                            id="register-name"
+                            name="name"
                             type="text"
                             placeholder="Name"
                             value={name}
@@ -1302,6 +1484,8 @@ function App() {
 
 
                     <input
+                        id="auth-email"
+                        name="email"
                         type="email"
                         placeholder="Email"
                         value={email}
@@ -1315,6 +1499,8 @@ function App() {
 
 
                     <input
+                        id="auth-password"
+                        name="password"
                         type="password"
                         placeholder="Password"
                         value={password}
@@ -1384,6 +1570,7 @@ function App() {
             </div>
 
         );
+
     };
 
 
@@ -1413,7 +1600,6 @@ function App() {
 
 
                     <div className="dashboard-grid">
-
 
                         <div className="card profile-card">
 
@@ -1531,6 +1717,7 @@ function App() {
                 </div>
 
             );
+
         }
 
 
@@ -1549,6 +1736,7 @@ function App() {
             </section>
 
         );
+
     };
 
 
@@ -1571,9 +1759,14 @@ function App() {
                 </p>
 
 
-                <div className="search-row">
+                <form
+                    className="search-row"
+                    onSubmit={searchDevelopers}
+                >
 
                     <input
+                        id="skill-search"
+                        name="skill"
                         type="text"
                         placeholder="Search by skill (e.g. Python)"
                         value={skillSearch}
@@ -1587,15 +1780,45 @@ function App() {
 
 
                     <button
+                        type="submit"
                         className="search-button"
-                        onClick={
-                            searchDevelopers
-                        }
+                        disabled={searchLoading}
                     >
-                        Search
+                        {searchLoading
+                            ? "Searching..."
+                            : "Search"}
                     </button>
 
-                </div>
+                </form>
+
+
+                {error && (
+
+                    <div className="error-message">
+                        {error}
+                    </div>
+
+                )}
+
+
+                {searchPerformed &&
+                    !searchLoading &&
+                    developers.length === 0 &&
+                    !error && (
+
+                        <div className="empty-projects">
+
+                            <h2>
+                                No developers found
+                            </h2>
+
+                            <p>
+                                No developers were found with the skill "{skillSearch}".
+                            </p>
+
+                        </div>
+
+                    )}
 
 
                 {developers.length > 0 && (
@@ -1636,6 +1859,7 @@ function App() {
             </div>
 
         );
+
     };
 
 
@@ -1665,19 +1889,20 @@ function App() {
                 </p>
 
 
-                {!isOwner && project.user_name && (
+                {!isOwner &&
+                    project.user_name && (
 
-                    <p className="project-author">
+                        <p className="project-author">
 
-                        Posted by:{" "}
+                            Posted by:{" "}
 
-                        <strong>
-                            {project.user_name}
-                        </strong>
+                            <strong>
+                                {project.user_name}
+                            </strong>
 
-                    </p>
+                        </p>
 
-                )}
+                    )}
 
 
                 {project.skills &&
@@ -1764,6 +1989,7 @@ function App() {
             </div>
 
         );
+
     };
 
 
@@ -1772,10 +1998,6 @@ function App() {
     ========================================= */
 
     const renderProjects = () => {
-
-        /*
-         * LOGGED-IN USER
-         */
 
         if (user) {
 
@@ -1802,7 +2024,8 @@ function App() {
                     </div>
 
 
-                    {loading && projects.length === 0 ? (
+                    {loading &&
+                        projects.length === 0 ? (
 
                         <div className="loading">
                             Loading projects...
@@ -1855,12 +2078,9 @@ function App() {
                 </div>
 
             );
+
         }
 
-
-        /*
-         * LOGGED-OUT USER
-         */
 
         return (
 
@@ -1919,6 +2139,7 @@ function App() {
             </div>
 
         );
+
     };
 
 
@@ -1945,6 +2166,7 @@ function App() {
                 </div>
 
             );
+
         }
 
 
@@ -1975,6 +2197,7 @@ function App() {
             </div>
 
         );
+
     };
 
 
@@ -2024,11 +2247,15 @@ function App() {
                     </div>
 
 
-                    <label className="form-label">
+                    <label
+                        className="form-label"
+                        htmlFor="project-title"
+                    >
                         Project Title
                     </label>
 
                     <input
+                        id="project-title"
                         type="text"
                         placeholder="e.g. DevConnect API"
                         value={projectTitle}
@@ -2041,11 +2268,15 @@ function App() {
                     />
 
 
-                    <label className="form-label">
+                    <label
+                        className="form-label"
+                        htmlFor="project-description"
+                    >
                         Description
                     </label>
 
                     <textarea
+                        id="project-description"
                         placeholder="Describe your project..."
                         value={
                             projectDescription
@@ -2059,17 +2290,25 @@ function App() {
                     />
 
 
-                    <label className="form-label">
+                    <label
+                        className="form-label"
+                        htmlFor="github-url"
+                    >
                         GitHub URL
-                        <span style={{
-                            color: "#94a3b8",
-                            fontWeight: "normal"
-                        }}>
+
+                        <span
+                            style={{
+                                color: "#94a3b8",
+                                fontWeight: "normal"
+                            }}
+                        >
                             {" "}(optional)
                         </span>
+
                     </label>
 
                     <input
+                        id="github-url"
                         type="text"
                         placeholder="https://github.com/username/project"
                         value={githubUrl}
@@ -2145,6 +2384,7 @@ function App() {
 
                                                 <button
                                                     className="remove-skill"
+                                                    type="button"
                                                     onClick={() =>
                                                         removeSelectedSkill(
                                                             skill.id
@@ -2167,7 +2407,7 @@ function App() {
 
                             <input
                                 type="text"
-                                placeholder="e.g. Python, React, FastAPI"
+                                placeholder="No skills available"
                                 disabled
                             />
 
@@ -2189,6 +2429,7 @@ function App() {
 
                         <button
                             className="cancel-button"
+                            type="button"
                             onClick={
                                 closeProjectModal
                             }
@@ -2199,6 +2440,7 @@ function App() {
 
                         <button
                             className="submit-button"
+                            type="button"
                             onClick={
                                 saveProject
                             }
@@ -2218,6 +2460,7 @@ function App() {
             </div>
 
         );
+
     };
 
 
@@ -2279,6 +2522,7 @@ function App() {
         </>
 
     );
+
 }
 
 
