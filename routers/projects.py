@@ -14,6 +14,11 @@ router = APIRouter(
     tags=["Projects"]
 )
 
+
+# =========================================================
+# CREATE PROJECT
+# =========================================================
+
 @router.post("/", response_model=ProjectResponse)
 def create_project(
     project: ProjectCreate,
@@ -33,6 +38,12 @@ def create_project(
 
     return new_project
 
+
+# =========================================================
+# PUBLIC PROJECTS
+# Anyone can view these without logging in
+# =========================================================
+
 @router.get("/public")
 def get_public_projects(
     db: Session = Depends(get_db)
@@ -46,7 +57,6 @@ def get_public_projects(
     result = []
 
     for project, user in projects:
-
         result.append({
             "id": project.id,
             "title": project.title,
@@ -66,6 +76,49 @@ def get_public_projects(
     return result
 
 
+# =========================================================
+# SEARCH PROJECTS BY SKILL
+# IMPORTANT: This must come BEFORE /{project_id} routes
+# =========================================================
+
+@router.get("/search")
+def search_projects_by_skill(
+    skill: str,
+    db: Session = Depends(get_db)
+):
+    projects = (
+        db.query(Project)
+        .join(Project.skills)
+        .filter(Skill.name.ilike(f"%{skill}%"))
+        .all()
+    )
+
+    return projects
+
+
+# =========================================================
+# GET MY PROJECTS
+# Only logged-in user can access their own projects
+# =========================================================
+
+@router.get("/", response_model=list[ProjectResponse])
+def get_projects(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    projects = (
+        db.query(Project)
+        .filter(Project.user_id == current_user.id)
+        .all()
+    )
+
+    return projects
+
+
+# =========================================================
+# ADD SKILL TO PROJECT
+# =========================================================
+
 @router.post("/{project_id}/skills/{skill_id}")
 def add_skill_to_project(
     project_id: int,
@@ -73,10 +126,14 @@ def add_skill_to_project(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.user_id == current_user.id
-    ).first()
+    project = (
+        db.query(Project)
+        .filter(
+            Project.id == project_id,
+            Project.user_id == current_user.id
+        )
+        .first()
+    )
 
     if not project:
         raise HTTPException(
@@ -84,9 +141,11 @@ def add_skill_to_project(
             detail="Project not found"
         )
 
-    skill = db.query(Skill).filter(
-        Skill.id == skill_id
-    ).first()
+    skill = (
+        db.query(Skill)
+        .filter(Skill.id == skill_id)
+        .first()
+    )
 
     if not skill:
         raise HTTPException(
@@ -108,16 +167,10 @@ def add_skill_to_project(
         "message": "Skill added to project successfully"
     }
 
-@router.get("/public", response_model=list[ProjectResponse])
-def get_public_projects(
-    db: Session = Depends(get_db)
-):
-    projects = (
-        db.query(Project)
-        .all()
-    )
 
-    return projects
+# =========================================================
+# GET PROJECT SKILLS
+# =========================================================
 
 @router.get("/{project_id}/skills")
 def get_project_skills(
@@ -125,10 +178,14 @@ def get_project_skills(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.user_id == current_user.id
-    ).first()
+    project = (
+        db.query(Project)
+        .filter(
+            Project.id == project_id,
+            Project.user_id == current_user.id
+        )
+        .first()
+    )
 
     if not project:
         raise HTTPException(
@@ -139,6 +196,10 @@ def get_project_skills(
     return project.skills
 
 
+# =========================================================
+# REMOVE SKILL FROM PROJECT
+# =========================================================
+
 @router.delete("/{project_id}/skills/{skill_id}")
 def remove_skill_from_project(
     project_id: int,
@@ -146,10 +207,14 @@ def remove_skill_from_project(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.user_id == current_user.id
-    ).first()
+    project = (
+        db.query(Project)
+        .filter(
+            Project.id == project_id,
+            Project.user_id == current_user.id
+        )
+        .first()
+    )
 
     if not project:
         raise HTTPException(
@@ -157,9 +222,11 @@ def remove_skill_from_project(
             detail="Project not found"
         )
 
-    skill = db.query(Skill).filter(
-        Skill.id == skill_id
-    ).first()
+    skill = (
+        db.query(Skill)
+        .filter(Skill.id == skill_id)
+        .first()
+    )
 
     if not skill:
         raise HTTPException(
@@ -182,19 +249,10 @@ def remove_skill_from_project(
     }
 
 
-@router.get("/", response_model=list[ProjectResponse])
-def get_projects(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    projects = (
-        db.query(Project)
-        .filter(Project.user_id == current_user.id)
-        .all()
-    )
-
-    return projects
-
+# =========================================================
+# UPDATE PROJECT
+# Only project owner can update
+# =========================================================
 
 @router.put("/{project_id}", response_model=ProjectResponse)
 def update_project(
@@ -230,19 +288,11 @@ def update_project(
 
     return project_in_db
 
-@router.get("/search")
-def search_projects_by_skill(
-    skill: str,
-    db: Session = Depends(get_db)
-):
-    projects = (
-        db.query(Project)
-        .join(Project.skills)
-        .filter(Skill.name.ilike(skill))
-        .all()
-    )
 
-    return projects
+# =========================================================
+# DELETE PROJECT
+# Only project owner can delete
+# =========================================================
 
 @router.delete("/{project_id}")
 def delete_project(
@@ -250,10 +300,14 @@ def delete_project(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.user_id == current_user.id
-    ).first()
+    project = (
+        db.query(Project)
+        .filter(
+            Project.id == project_id,
+            Project.user_id == current_user.id
+        )
+        .first()
+    )
 
     if not project:
         raise HTTPException(
@@ -264,4 +318,6 @@ def delete_project(
     db.delete(project)
     db.commit()
 
-    return {"message": "Project deleted successfully"}
+    return {
+        "message": "Project deleted successfully"
+    }
