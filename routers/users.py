@@ -74,13 +74,11 @@ def search_users_by_skill(
     if not search_term:
         return []
 
-    users = (
+    # Search users who have the skill in their profile
+    profile_users = (
         db.query(User)
         .join(User.skills)
-        .filter(
-            Skill.name.ilike(f"%{search_term}%")
-        )
-        .distinct()
+        .filter(Skill.name.ilike(f"%{search_term}%"))
         .all()
     )
 
@@ -90,7 +88,7 @@ def search_users_by_skill(
             "name": user.name,
             "email": user.email
         }
-        for user in users
+        for user in profile_users
     ]
 
 # IMPORTANT:
