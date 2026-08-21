@@ -1,56 +1,42 @@
 import os
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy.engine import URL
-
 
 load_dotenv()
 
-
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-if DATABASE_URL:
-    if DATABASE_URL.startswith("postgres://"):
-        database_url = DATABASE_URL.replace(
-            "postgres://",
-            "postgresql+psycopg://",
-            1
-        )
-    elif DATABASE_URL.startswith("postgresql://"):
-        database_url = DATABASE_URL.replace(
-            "postgresql://",
-            "postgresql+psycopg://",
-            1
-        )
-    else:
-        database_url = DATABASE_URL
-else:
-    database_url = URL.create(
-        drivername="postgresql+psycopg",
-        username="postgres",
-        password="djtherock@99",
-        host="localhost",
-        port=5432,
-        database="devconnect_db"
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is not set")
+
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace(
+        "postgres://",
+        "postgresql+psycopg://",
+        1
+    )
+elif DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace(
+        "postgresql://",
+        "postgresql+psycopg://",
+        1
     )
 
-
-engine = create_engine(database_url)
+engine = create_engine(DATABASE_URL)
 
 Base = declarative_base()
 
 SessionLocal = sessionmaker(
-    autocommit=False,
+    bind=engine,
     autoflush=False,
-    bind=engine
+    autocommit=False
 )
 
 
 def get_db():
     db = SessionLocal()
-
     try:
         yield db
     finally:

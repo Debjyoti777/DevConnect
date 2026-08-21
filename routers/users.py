@@ -1,309 +1,135 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 from sqlalchemy import or_
+from sqlalchemy.orm import Session
 
 from database import get_db
-
 from models.user import User
 from models.skill import Skill
 from models.project import Project
-
-from schemas.user import (
-    UserCreate,
-    UserResponse,
-    ProfileResponse
-)
-
-from utils.password import hash_password
+from schemas.user import UserCreate, UserResponse, ProfileResponse
 from utils.auth import get_current_user
+from utils.password import hash_password
+
+router = APIRouter(tags=["Users"])
 
 
-router = APIRouter()
+def user_data(user):
+    return {"id": user.id, "name": user.name, "email": user.email}
 
 
-# ============================================================
-# GET ALL USERS
-# ============================================================
-
-@router.get("/users")
-def get_users(
-    db: Session = Depends(get_db)
-):
-    users = db.query(User).all()
-
-    return [
-        {
-            "id": user.id,
-            "name": user.name,
-            "email": user.email
-        }
-        for user in users
-    ]
+def find_user(user_id: int, db: Session):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 
-# ============================================================
-# CREATE USER
-# ============================================================
+@router.get("/users", summary="Get all users")
+def get_users(db: Session = Depends(get_db)):
+    return [user_data(user) for user in db.query(User).all()]
 
-@router.post(
-    "/users",
-    response_model=UserResponse,
-    status_code=201
-)
-def create_user(
-    user: UserCreate,
-    db: Session = Depends(get_db)
-):
 
+@router.post("/users", response_model=UserResponse, status_code=201, summary="Create user")
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
     new_user = User(
         name=user.name,
         email=user.email,
         password=hash_password(user.password)
     )
-
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-
     return new_user
 
 
-# ============================================================
-# SEARCH DEVELOPERS BY SKILL
-#
-# Searches:
-# 1. Skills directly attached to the user
-# 2. Skills attached to the user's projects
-# ============================================================
-
-@router.get("/users/search")
-def search_users_by_skill(
-    skill: str,
-    db: Session = Depends(get_db)
-):
-
-    search_term = skill.strip()
-
-    if not search_term:
+@router.get("/users/search", summary="Search developers by skill")
+def search_users_by_skill(skill: str, db: Session = Depends(get_db)):
+    term = skill.strip()
+    if not term:
         return []
 
-    search_pattern = f"%{search_term}%"
-
+    pattern = f"%{term}%"
     users = (
         db.query(User)
         .filter(
             or_(
-                User.skills.any(
-                    Skill.name.ilike(search_pattern)
-                ),
-
+                User.skills.any(Skill.name.ilike(pattern)),
                 User.projects.any(
-                    Project.skills.any(
-                        Skill.name.ilike(search_pattern)
-                    )
+                    Project.skills.any(Skill.name.ilike(pattern))
                 )
             )
         )
         .distinct()
         .all()
     )
-
-    return [
-        {
-            "id": user.id,
-            "name": user.name,
-            "email": user.email
-        }
-        for user in users
-    ]
+    return [user_data(user) for user in users]
 
 
-# ============================================================
-# CURRENT LOGGED-IN USER
-#
-# IMPORTANT:
-# This MUST come BEFORE /users/{user_id}
-# ============================================================
-
-@router.get(
-    "/users/me",
-    response_model=ProfileResponse
-)
-def get_me(
-    current_user: User = Depends(get_current_user)
-):
-
+@router.get("/users/me", response_model=ProfileResponse, summary="Get current user")
+def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
-# ============================================================
-# GET USER BY ID
-# ============================================================
-
-@router.get(
-    "/users/{user_id}",
-    response_model=UserResponse
-)
-def get_user(
-    user_id: int,
-    db: Session = Depends(get_db)
-):
-
-    user = (
-        db.query(User)
-        .filter(User.id == user_id)
-        .first()
-    )
-
-    if user is None:
-        raise HTTPException(
-            status_code=404,
-            detail="User not found"
-        )
-
-    return user
+@router.get("/users/{user_id}", response_model=UserResponse, summary="Get user")
+def get_user(user_id: int, db: Session = Depends(get_db)):
+    return find_user(user_id, db)
 
 
-# ============================================================
-# UPDATE USER
-# ============================================================
+@router.put("/users/{user_id}", response_model=UserResponse, summary="Update user")
+def update_user(user_id: int, user: UserCreate, db: Session = Depends(get_db)):
+    existing = find_user(user_id, db)
 
-@router.put(
-    "/users/{user_id}",
-    response_model=UserResponse
-)
-def update_user(
-    user_id: int,
-    user: UserCreate,
-    db: Session = Depends(get_db)
-):
-
-    existing_user = (
-        db.query(User)
-        .filter(User.id == user_id)
-        .first()
-    )
-
-    if existing_user is None:
-        raise HTTPException(
-            status_code=404,
-            detail="User not found"
-        )
-
-    existing_user.name = user.name
-    existing_user.email = user.email
-    existing_user.password = hash_password(
-        user.password
-    )
+    existing.name = user.name
+    existing.email = user.email
+    existing.password = hash_password(user.password)
 
     db.commit()
-    db.refresh(existing_user)
+    db.refresh(existing)
+    return existing
 
-    return existing_user
 
-
-# ============================================================
-# DELETE USER
-# ============================================================
-
-@router.delete("/users/{user_id}")
-def delete_user(
-    user_id: int,
-    db: Session = Depends(get_db)
-):
-
-    user = (
-        db.query(User)
-        .filter(User.id == user_id)
-        .first()
-    )
-
-    if user is None:
-        raise HTTPException(
-            status_code=404,
-            detail="User not found"
-        )
-
+@router.delete("/users/{user_id}", summary="Delete user")
+def delete_user(user_id: int, db: Session = Depends(get_db)):
+    user = find_user(user_id, db)
     db.delete(user)
     db.commit()
-
-    return {
-        "message": "User deleted successfully"
-    }
+    return {"message": "User deleted successfully"}
 
 
-# ============================================================
-# ADD SKILL TO CURRENT USER
-# ============================================================
-
-@router.post("/me/skills/{skill_id}")
+@router.post("/me/skills/{skill_id}", summary="Add skill to current user")
 def add_skill_to_user(
     skill_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    skill = db.query(Skill).filter(Skill.id == skill_id).first()
 
-    skill = (
-        db.query(Skill)
-        .filter(Skill.id == skill_id)
-        .first()
-    )
-
-    if skill is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Skill not found"
-        )
+    if not skill:
+        raise HTTPException(status_code=404, detail="Skill not found")
 
     if skill in current_user.skills:
-        raise HTTPException(
-            status_code=400,
-            detail="Skill already added"
-        )
+        raise HTTPException(status_code=400, detail="Skill already added")
 
     current_user.skills.append(skill)
-
     db.commit()
-
-    return {
-        "message": "Skill added successfully"
-    }
+    return {"message": "Skill added successfully"}
 
 
-# ============================================================
-# GET CURRENT USER'S SKILLS
-# ============================================================
-
-@router.get("/me/skills")
-def get_my_skills(
-    current_user: User = Depends(get_current_user)
-):
-
+@router.get("/me/skills", summary="Get current user's skills")
+def get_my_skills(current_user: User = Depends(get_current_user)):
     return current_user.skills
 
 
-# ============================================================
-# REMOVE SKILL FROM CURRENT USER
-# ============================================================
-
-@router.delete("/me/skills/{skill_id}")
+@router.delete("/me/skills/{skill_id}", summary="Remove skill from current user")
 def remove_skill_from_user(
     skill_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    skill = db.query(Skill).filter(Skill.id == skill_id).first()
 
-    skill = (
-        db.query(Skill)
-        .filter(Skill.id == skill_id)
-        .first()
-    )
-
-    if skill is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Skill not found"
-        )
+    if not skill:
+        raise HTTPException(status_code=404, detail="Skill not found")
 
     if skill not in current_user.skills:
         raise HTTPException(
@@ -312,9 +138,5 @@ def remove_skill_from_user(
         )
 
     current_user.skills.remove(skill)
-
     db.commit()
-
-    return {
-        "message": "Skill removed successfully"
-    }
+    return {"message": "Skill removed successfully"}

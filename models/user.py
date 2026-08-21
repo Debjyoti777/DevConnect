@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Table, ForeignKey
 from sqlalchemy.orm import relationship
+
 from database import Base
 
 
@@ -24,5 +25,4 @@ class User(Base):
         secondary=user_skills,
         back_populates="users"
     )
-
-    projects= relationship("Project", back_populates="user")
+    projects = relationship("Project", back_populates="user")

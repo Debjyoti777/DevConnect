@@ -14,38 +14,33 @@ router = APIRouter(
 )
 
 
-@router.post("/login")
+@router.post(
+    "/login",
+    summary="Login user",
+    description="Authenticate a user and return a JWT access token."
+)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-
-    user_in_db = (
+    user = (
         db.query(User)
         .filter(User.email == form_data.username)
         .first()
     )
 
-    if not user_in_db:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid email or password"
-        )
-
-    if not verify_password(
+    if not user or not verify_password(
         form_data.password,
-        user_in_db.password
+        user.password
     ):
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"
         )
 
-    access_token = create_access_token(
-        {"sub": str(user_in_db.id)}
-    )
+    token = create_access_token({"sub": str(user.id)})
 
     return {
-        "access_token": access_token,
+        "access_token": token,
         "token_type": "bearer"
     }
